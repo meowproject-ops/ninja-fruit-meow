@@ -1,26 +1,140 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <title>AI Expressive Robot Face</title>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <video id="input_video" style="display:none;" autoplay playsinline></video>
+  <head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Bioluminescent Jellyfish</title>
+      <style>
+          body { margin: 0; overflow: hidden; background: #00050a; }
+          canvas { display: block; width: 100vw; height: 100vh; }
+      </style>
+  </head>
+  <body>
+      <div id="container"></div>
+      <script type="importmap">
+          { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+      </script>
+      <script type="module">
+          import * as THREE from 'three';
 
-  <div class="face">
-    <div class="eye left">
-      <div class="pupil"></div> <div class="eyelid upper"></div>
-      <div class="eyelid lower"></div>
-    </div>
-    <div class="eye right">
-      <div class="pupil"></div>
-      <div class="eyelid upper"></div>
-      <div class="eyelid lower"></div>
-    </div>
-  </div>
+// --- Scene Setup ---
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+document.body.appendChild(renderer.domElement);
 
-  <script src="index.js"></script>
-</body>
+// --- Custom Shader for the "Glow" Effect ---
+const jellyMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+        uTime: { value: 0 },
+        uColor: { value: new THREE.Color(0x0077ff) }, // Deeper blue
+        uGlowColor: { value: new THREE.Color(0xd0eaff) } // Brighter highlight
+    },
+    vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vPosition;
+        varying float vDistortion;
+        uniform float uTime;
+
+        void main() {
+            vNormal = normalize(normalMatrix * normal);
+            
+            // Organic Pulse
+            float pulse = sin(uTime * 1.5) * 0.15;
+            // Only pulse the bottom part of the bell more
+            float strength = smoothstep(0.0, -1.0, position.y);
+            
+            // Add a wave motion to tentacles/bottom
+            float wave = sin(uTime * 2.0 + position.y * 5.0) * 0.1;
+            
+            vec3 newPos = position + normal * pulse * (1.0 - position.y);
+            newPos.x += wave * strength; 
+            
+            vPosition = newPos;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(newPos, 1.0);
+        }
+    `,
+    fragmentShader: `
+    varying vec3 vNormal;
+    varying vec3 vPosition;
+    uniform vec3 uColor;
+    uniform vec3 uGlowColor;
+    uniform float uTime;
+
+    void main() {
+        // 1. Better Fresnel Calculation
+        vec3 viewDirection = normalize(cameraPosition - vPosition);
+        float fresnel = pow(1.0 - dot(vNormal, viewDirection), 3.0);
+        
+        // 2. Control the "Core" transparency
+        // We want the center to be VERY transparent (0.1) 
+        // and the edges to glow (fresnel)
+        float alpha = fresnel * 0.8 + 0.05; 
+        
+        // 3. Mix colors based on the glow
+        vec3 finalColor = mix(uColor, uGlowColor, fresnel);
+        
+        gl_FragColor = vec4(finalColor, alpha);
+    }
+`,
+
+    transparent: true,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending, // Key for the glowing look
+    depthWrite: false
+});
+
+// --- Jellyfish Bell (High Res) ---
+const bellGeo = new THREE.SphereGeometry(1, 64, 64, 0, Math.PI * 2, 0, Math.PI / 1.6);
+const bell = new THREE.Mesh(bellGeo, jellyMaterial);
+scene.add(bell);
+
+// --- Tentacles ---
+const tentacles = [];
+const tentacleCount = 12;
+for (let i = 0; i < tentacleCount; i++) {
+    // Longer, thinner tentacles
+    const points = [];
+    for (let j = 0; j < 25; j++) points.push(new THREE.Vector3(0, -j * 0.2, 0));
+    
+    const curve = new THREE.CatmullRomCurve3(points);
+    const geo = new THREE.TubeGeometry(curve, 32, 0.015, 8, false);
+    const tentacle = new THREE.Mesh(geo, jellyMaterial);
+    
+    const angle = (i / tentacleCount) * Math.PI * 2;
+    tentacle.position.x = Math.cos(angle) * 0.85;
+    tentacle.position.z = Math.sin(angle) * 0.85;
+    
+    bell.add(tentacle);
+    tentacles.push(tentacle);
+}
+
+camera.position.z = 5;
+
+// --- Animation Loop ---
+function animate(time) {
+    const t = time * 0.001;
+    jellyMaterial.uniforms.uTime.value = t;
+
+    // Smooth floating motion
+    bell.position.y = Math.sin(t * 0.8) * 0.3;
+    bell.rotation.z = Math.sin(t * 0.5) * 0.05;
+    bell.rotation.y = t * 0.1;
+
+    renderer.render(scene, camera);
+    requestAnimationFrame(animate);
+}
+
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+requestAnimationFrame(animate);
+
+      </script>
+  </body>
 </html>
