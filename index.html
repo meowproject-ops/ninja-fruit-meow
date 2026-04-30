@@ -1,17 +1,24 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <title>AI Expressive Robot Face</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <video id="webcam" style="display:none;" autoplay playsinline></video>
-  
-  <div id="robot-face">
-    <div class="eye left"><div class="pupil"></div></div>
-    <div class="eye right"><div class="pupil"></div></div>
-    <div id="mouth"></div>
+  <video id="input_video" style="display:none;" autoplay playsinline></video>
+
+  <div class="face">
+    <div class="eye left">
+      <div class="pupil"></div> <div class="eyelid upper"></div>
+      <div class="eyelid lower"></div>
+    </div>
+    <div class="eye right">
+      <div class="pupil"></div>
+      <div class="eyelid upper"></div>
+      <div class="eyelid lower"></div>
+    </div>
   </div>
 
   <script src="index.js"></script>
