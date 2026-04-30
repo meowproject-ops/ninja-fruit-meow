@@ -1,33 +1,44 @@
-const videoElement = document.getElementById('webcam');
+const videoElement = document.getElementById('input_video');
+const faceElement = document.querySelector('.face');
 const pupils = document.querySelectorAll('.pupil');
 
+let curX = 0, curY = 0;
+
 function onResults(results) {
-  if (results.multiFaceLandmarks && results.multiFaceLandmarks[0]) {
-    const face = results.multiFaceLandmarks[0];
-    
-    // Landmark 4 is the nose tip
-    const nose = face[4];
-    
-    // Convert nose position to pupil movement
-    // nose.x is 0 to 1. We want to move pupil -40px to 40px
-    const xMove = (0.5 - nose.x) * 100;
-    const yMove = (nose.y - 0.5) * 100;
+  if (!results.multiFaceLandmarks || !results.multiFaceLandmarks[0]) return;
 
-    pupils.forEach(pupil => {
-      pupil.style.transform = `translate(${xMove}px, ${yMove}px)`;
-    });
+  const landmarks = results.multiFaceLandmarks[0];
+  const nose = landmarks[4]; // Nose tip for tracking
+  
+  // 1. SMOOTH TRACKING
+  // Calculate target position based on where you are in the camera
+  const targetX = (0.5 - nose.x) * 100;
+  const targetY = (nose.y - 0.5) * 100;
+  
+  // Smoothly move the pupils (LERP)
+  curX += (targetX - curX) * 0.1;
+  curY += (targetY - curY) * 0.1;
+  
+  pupils.forEach(p => {
+    p.style.transform = `translate(${curX}px, ${curY}px)`;
+  });
 
-    // Detect Smile (Distance between lip corners)
-    const mouthLeft = face[61];
-    const mouthRight = face[291];
-    const smileWidth = Math.abs(mouthLeft.x - mouthRight.x);
-    
-    if (smileWidth > 0.15) {
-       document.documentElement.style.setProperty('--eye-color', '#ff00ff'); // Happy pink!
-    }
+  // 2. AUTOMATIC EMOTIONS
+  const topLip = landmarks[13].y;
+  const bottomLip = landmarks[14].y;
+  const mouthWidth = Math.abs(landmarks[61].x - landmarks[291].x);
+
+  // Clear previous emotion
+  faceElement.className = "face";
+
+  if (mouthWidth > 0.18) {
+    faceElement.classList.add("happy"); // You Smile = Robot Happy
+  } else if (topLip - landmarks[10].y < 0.05) {
+    faceElement.classList.add("angry"); // Brows down = Robot Mad
   }
 }
 
+// Setup MediaPipe
 const faceMesh = new FaceMesh({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`});
 faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5 });
 faceMesh.onResults(onResults);
@@ -37,3 +48,11 @@ const camera = new Camera(videoElement, {
   width: 640, height: 480
 });
 camera.start();
+
+// Simple Auto-Blink Logic
+setInterval(() => {
+  document.querySelectorAll('.eyelid.upper').forEach(e => e.style.top = "0%");
+  setTimeout(() => {
+    document.querySelectorAll('.eyelid.upper').forEach(e => e.style.top = "-100%");
+  }, 150);
+}, 4000);
