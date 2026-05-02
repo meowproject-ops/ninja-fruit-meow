@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Face Assistant</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #000810;
+            min-height: 100vh;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            font-family: 'Share Tech Mono', monospace;
+            color: #00ffcc; overflow: hidden; position: relative;
+        }
+
+        body::before {
+            content: ''; position: fixed; inset: 0;
+            background-image:
+                linear-gradient(rgba(0,255,204,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,204,0.04) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events: none; z-index: 0;
+        }
+        body::after {
+            content: ''; position: fixed; inset: 0;
+            background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.12) 2px, rgba(0,0,0,0.12) 4px);
+            pointer-events: none; z-index: 10;
+        }
+
+        .container {
+            position: relative; z-index: 1;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 22px;
+            padding: 24px 16px; width: 100%; max-width: 400px;
+        }
+
+        .header { font-family: 'Orbitron', sans-serif; font-size: 10px; letter-spacing: 5px; color: #00aa88; }
+
+        .face-panel {
+            background: #000f1a; border: 1px solid #00aa88; border-radius: 12px;
+            padding: 40px 56px; display: flex; flex-direction: column;
+            align-items: center; gap: 24px; position: relative;
+            box-shadow: 0 0 40px rgba(0,255,204,0.08); width: 100%;
+        }
+        .face-panel::before { content:''; position:absolute; top:-1px; left:-1px; width:16px; height:16px; border-top:2px solid #00ffcc; border-left:2px solid #00ffcc; }
+        .face-panel::after  { content:''; position:absolute; bottom:-1px; right:-1px; width:16px; height:16px; border-bottom:2px solid #00ffcc; border-right:2px solid #00ffcc; }
+
+        .eyes { display: flex; gap: 44px; }
+
+        .eye {
+            width: 68px; height: 68px; background: #00ffcc; border-radius: 50%;
+            box-shadow: 0 0 20px #00ffcc, 0 0 50px rgba(0,255,204,0.4);
+            animation: blink 5s infinite; position: relative;
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+        .eye::after {
+            content:''; position:absolute; width:20px; height:20px;
+            background:#000810; border-radius:50%;
+            top:50%; left:50%; transform:translate(-50%,-50%);
+        }
+        @keyframes blink { 0%,88%,100%{transform:scaleY(1);} 92%,96%{transform:scaleY(0.05);} }
+        .eye.talking   { animation: etalk 0.2s infinite; }
+        @keyframes etalk { 0%,100%{transform:scaleY(1);} 50%{transform:scaleY(0.3);} }
+        .eye.listening { background:#ffcc00; box-shadow:0 0 20px #ffcc00,0 0 50px rgba(255,204,0,0.4); animation:epulse 0.5s infinite; }
+        @keyframes epulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.1);} }
+        .eye.thinking  { animation: ethink 1s infinite; }
+        @keyframes ethink { 0%,100%{transform:scale(1);opacity:1;} 50%{transform:scale(0.85);opacity:0.5;} }
+        .eye.error { background:#ff3366; box-shadow:0 0 20px #ff3366; animation:none; }
+
+        .mouth { width:72px; height:10px; background:#00aa88; border-radius:5px; box-shadow:0 0 10px #00aa88; }
+        .mouth.talking { animation: mtalk 0.2s infinite; }
+        @keyframes mtalk { 0%,100%{height:10px;} 50%{height:3px;} }
+
+        .status-box {
+            display:flex; align-items:center; gap:10px; background:#000f1a;
+            border:1px solid rgba(0,255,204,0.15); border-radius:6px; padding:10px 14px; width:100%;
+        }
+        .dot { width:8px; height:8px; border-radius:50%; background:#00aa88; flex-shrink:0; animation:dpulse 2s infinite; }
+        @keyframes dpulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+        .dot.active { background:#00ffcc; animation:dpulse 0.5s infinite; }
+        .dot.error  { background:#ff3366; animation:none; }
+
+        #status-txt { font-size:11px; color:#00ffcc; letter-spacing:1px; flex:1; word-break:break-word; line-height:1.5; }
+
+        #transcript {
+            width:100%; font-size:11px; color:rgba(0,255,204,0.5);
+            text-align:center; line-height:1.7; padding:8px 12px;
+            background:rgba(0,255,204,0.03); border:1px solid rgba(0,255,204,0.08);
+            border-radius:6px; display:none;
+        }
+
+        #setup {
+            position:fixed; inset:0; background:rgba(0,8,16,0.98); z-index:100;
+            display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:16px; padding:28px; overflow-y:auto;
+        }
+        #setup h2 { font-family:'Orbitron',sans-serif; color:#00ffcc; font-size:13px; letter-spacing:4px; }
+
+        .setup-box {
+            background:#000f1a; border:1px solid rgba(0,255,204,0.2);
+            border-radius:8px; padding:14px 18px;
+            width:100%; max-width:320px;
+            font-size:12px; color:#00aa88; line-height:2.2;
+        }
+        .setup-box b { color:#00ffcc; }
+        .setup-box a { color:#00ffcc; }
+
+        #key-input {
+            width:100%; max-width:320px; background:#000f1a;
+            border:1px solid #00aa88; border-radius:4px; color:#00ffcc;
+            font-family:'Share Tech Mono',monospace; font-size:12px;
+            padding:12px 14px; outline:none; transition:border-color 0.2s;
+        }
+        #key-input:focus { border-color:#00ffcc; }
+        #key-input::placeholder { color:rgba(0,255,204,0.3); font-size:11px; }
+
+        .btn {
+            background:transparent; border:1px solid #00ffcc; color:#00ffcc;
+            font-family:'Orbitron',sans-serif; font-size:11px; font-weight:700;
+            letter-spacing:4px; padding:13px 36px; cursor:pointer; border-radius:4px;
+            text-transform:uppercase; transition:all 0.2s; position:relative; overflow:hidden;
+        }
+        .btn::before { content:''; position:absolute; inset:0; background:#00ffcc; transform:scaleX(0); transform-origin:left; transition:transform 0.2s; z-index:-1; }
+        .btn:hover:not(:disabled) { color:#000810; }
+        .btn:hover:not(:disabled)::before { transform:scaleX(1); }
+        .btn:active:not(:disabled) { transform:scale(0.97); }
+        .btn:disabled { opacity:0.35; cursor:not-allowed; }
+
+        #main-btn { width:200px; }
+        .footer { font-size:9px; color:rgba(0,255,204,0.2); letter-spacing:2px; cursor:default; }
+        #key-err { display:none; color:#ff3366; font-size:11px; text-align:center; }
+        #no-mic  { display:none; color:#ff3366; font-size:11px; text-align:center; }
+    </style>
+</head>
+<body>
+
+<div id="setup">
+    <h2>// SYSTEM INIT</h2>
+    <div class="setup-box">
+        <b>Get your FREE API key:</b><br>
+        1. Go to <a href="https://openrouter.ai" target="_blank"><b>openrouter.ai</b></a><br>
+        2. Tap <b>Sign In</b> → create free account<br>
+        3. Go to <a href="https://openrouter.ai/keys" target="_blank"><b>openrouter.ai/keys</b></a><br>
+        4. Tap <b>Create Key</b> → copy it<br>
+        5. Paste below ↓ — <b>completely free!</b>
+    </div>
+    <input type="password" id="key-input" placeholder="sk-or-v1-..." autocomplete="off" />
+    <div id="key-err">Please enter your OpenRouter key</div>
+    <button class="btn" onclick="saveKey()">ACTIVATE</button>
+    <p style="color:#00aa88;font-size:10px;text-align:center;">Key saved in your browser only · Never sent anywhere else</p>
+</div>
+
+<div class="container">
+    <div class="header">// NEURAL INTERFACE V3.0</div>
+    <div class="face-panel">
+        <div class="eyes">
+            <div class="eye" id="eL"></div>
+            <div class="eye" id="eR"></div>
+        </div>
+        <div class="mouth" id="mouth"></div>
+    </div>
+    <div class="status-box">
+        <div class="dot" id="dot"></div>
+        <div id="status-txt">TAP WAKE UP TO BEGIN</div>
+    </div>
+    <div id="transcript"></div>
+    <div id="no-mic">⚠ Use Chrome browser for microphone support</div>
+    <button class="btn" id="main-btn" onclick="handleBtn()">WAKE UP</button>
+    <div class="footer">POWERED BY OPENROUTER · LLAMA · SPEECH API</div>
+</div>
+
+<script>
+    let API_KEY = '';
+    let isAwake = false, isListening = false, isSpeaking = false;
+    let rec = null, recReady = false;
+    let history = [];
+
+    const eL = document.getElementById('eL');
+    const eR = document.getElementById('eR');
+    const mouth = document.getElementById('mouth');
+    const dot = document.getElementById('dot');
+    const stxt = document.getElementById('status-txt');
+    const tbox = document.getElementById('transcript');
+    const mbtn = document.getElementById('main-btn');
+
+    function saveKey() {
+        const val = document.getElementById('key-input').value.trim();
+        if (!val || val.length < 10) {
+            document.getElementById('key-err').style.display = 'block'; return;
+        }
+        API_KEY = val;
+        document.getElementById('setup').style.display = 'none';
+    }
+    document.getElementById('key-input').addEventListener('keydown', e => { if (e.key === 'Enter') saveKey(); });
+
+    function setFace(state) {
+        eL.className = eR.className = 'eye';
+        mouth.className = 'mouth';
+        if (state === 'blink')     { eL.classList.add('blink'); eR.classList.add('blink'); }
+        if (state === 'talking')   { eL.classList.add('talking'); eR.classList.add('talking'); mouth.classList.add('talking'); }
+        if (state === 'listening') { eL.classList.add('listening'); eR.classList.add('listening'); }
+        if (state === 'thinking')  { eL.classList.add('thinking'); eR.classList.add('thinking'); }
+        if (state === 'error')     { eL.classList.add('error'); eR.classList.add('error'); dot.className = 'dot error'; }
+    }
+
+    function setStatus(msg, active) {
+        stxt.textContent = msg;
+        dot.className = 'dot' + (active ? ' active' : '');
+    }
+
+    function initRec() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+            document.getElementById('no-mic').style.display = 'block';
+            mbtn.disabled = true; setStatus('USE CHROME BROWSER', false); return;
+        }
+        rec = new SR();
+        rec.continuous = false; rec.interimResults = false; rec.lang = 'en-US';
+        rec.onstart = () => { isListening = true; setFace('listening'); setStatus('LISTENING... SPEAK NOW', true); };
+        rec.onresult = e => {
+            const txt = e.results[0][0].transcript;
+            tbox.style.display = 'block'; tbox.textContent = '> ' + txt;
+            isListening = false; setFace('thinking'); setStatus('THINKING...', true);
+            askAI(txt);
+        };
+        rec.onerror = e => {
+            isListening = false;
+            if (e.error === 'not-allowed') { setStatus('MIC DENIED — ALLOW IN BROWSER SETTINGS', false); setFace('error'); }
+            else if (e.error === 'no-speech') { setStatus('NO SPEECH — TAP TALK TO RETRY', false); setFace('blink'); }
+            else { setStatus('MIC ERROR: ' + e.error.toUpperCase(), false); }
+            mbtn.textContent = 'TALK'; mbtn.disabled = false;
+        };
+        rec.onend = () => { isListening = false; if (!isSpeaking) mbtn.disabled = false; };
+        recReady = true;
+    }
+
+    function handleBtn() {
+        if (!isAwake) {
+            const silent = new SpeechSynthesisUtterance('.');
+            silent.volume = 0.001;
+            silent.onend = () => speak('System online. How can I help you?');
+            window.speechSynthesis.speak(silent);
+            isAwake = true; mbtn.textContent = 'TALK';
+            setStatus('WAKING UP...', true); initRec(); return;
+        }
+        if (isListening || isSpeaking) return;
+        if (!recReady) { setStatus('MIC NOT READY', false); return; }
+        try { rec.abort(); } catch(e) {}
+        setTimeout(() => {
+            try { rec.start(); mbtn.textContent = 'LISTENING...'; mbtn.disabled = true; }
+            catch(e) { setStatus('TAP AGAIN', false); mbtn.disabled = false; }
+        }, 150);
+    }
+
+    async function askAI(question) {
+        mbtn.disabled = true;
+        history.push({ role: 'user', content: question });
+        try {
+            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + API_KEY,
+                    'HTTP-Referer': window.location.href,
+                    'X-Title': 'AI Face Assistant'
+                },
+                body: JSON.stringify({
+                    model: 'meta-llama/llama-3.2-3b-instruct:free',
+                    messages: [
+                        { role: 'system', content: 'You are a friendly AI voice assistant. Reply in 1-2 short sentences only. No markdown, no bullet points, plain speech only.' },
+                        ...history
+                    ],
+                    max_tokens: 100
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                const msg = data?.error?.message || ('Error ' + res.status);
+                if (res.status === 401) { setStatus('INVALID KEY — DOUBLE TAP FOOTER TO RESET', false); }
+                else { setStatus('ERROR: ' + msg.substring(0,45).toUpperCase(), false); }
+                setFace('error'); history.pop();
+                mbtn.disabled = false; mbtn.textContent = 'TALK'; return;
+            }
+            const reply = data?.choices?.[0]?.message?.content?.trim() || 'Sorry, no response.';
+            history.push({ role: 'assistant', content: reply });
+            speak(reply);
+        } catch(err) {
+            setStatus('NETWORK ERROR — CHECK CONNECTION', false); setFace('error');
+            history.pop(); mbtn.disabled = false; mbtn.textContent = 'TALK';
+        }
+    }
+
+    function speak(text) {
+        window.speechSynthesis.cancel();
+        isSpeaking = true;
+        tbox.style.display = 'block'; tbox.textContent = '< ' + text;
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 1.05; u.pitch = 0.9;
+        const voices = window.speechSynthesis.getVoices();
+        const v = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Daniel')))
+               || voices.find(v => v.lang.startsWith('en'));
+        if (v) u.voice = v;
+        u.onstart = () => { isSpeaking = true; setFace('talking'); setStatus(text.length > 55 ? text.substring(0,55)+'...' : text, true); mbtn.disabled = true; };
+        u.onend   = () => { isSpeaking = false; setFace('blink'); setStatus('TAP TALK TO SPEAK AGAIN', false); mbtn.textContent = 'TALK'; mbtn.disabled = false; };
+        u.onerror = () => { isSpeaking = false; setFace('blink'); setStatus('TAP TALK TO SPEAK AGAIN', false); mbtn.disabled = false; mbtn.textContent = 'TALK'; };
+        if (!window.speechSynthesis.getVoices().length) {
+            window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.speak(u);
+        } else { window.speechSynthesis.speak(u); }
+    }
+
+    document.querySelector('.footer').addEventListener('dblclick', () => {
+        if (confirm('Reset API key?')) location.reload();
+    });
+
+    setFace('blink');
+</script>
+</body>
+  </html>
+  
